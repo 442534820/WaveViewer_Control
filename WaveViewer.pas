@@ -7,42 +7,61 @@ uses
   System.Contnrs,
   Vcl.Graphics,
   Vcl.Controls;
-        
+
 type
   TBaseLineStyle = (blsCustom, blsTop, blsBottom, blsMid);
   TWaveViewMode = (wvmCover, wvmRoll);
-            
+
   TWaveViewer = class;
-              
-  TWaveLine = class(TObject)
-  private       
-    FColor: TColor;  
+
+  TWaveLine = class(TComponent)
+  private
+    FColor: TColor;
+    FWaveViewMode: TWaveViewMode;
+    FVisable: Boolean;
     procedure SetColor(Value: TColor);
+    procedure SetWaveViewMode(Value: TWaveViewMode);
+    procedure SetVisable(Value: Boolean);
+    procedure SetWaveLength(Value: Integer);
   protected
   public
     BaseMarkVisable: Boolean;
-    Visable: Boolean;
     Order: Integer;
     ValueOfXGrid: Integer;
     ValueOfYGrid: Single;
     Datas: array of Single;
-    Points: array of Integer;
+    Points: array of TPoints;
     DataLength: Integer;
     CurrentPoint: Integer;
-    WaveViewMode: TWaveViewMode;
     Parent: TWaveViewer;
-    procedure SetWaveLength(Value: Integer);
     procedure AddData(Value: Single);
+    procedure UpdatePoints;
     constructor Create(AOwner: TWaveViewer); overload;
     constructor Create(AOwner: TWaveViewer; Len: Integer); overload;
+    procedure Paint;
   published
     property Color: TColor read FColor write SetColor;
+    property WaveViewMode: TWaveViewMode read FWaveViewMode write SetWaveViewMode;
+    property Visable: Boolean read FVisable write SetVisable default True;
   end;
 
-  TWaveLineList = class(TObjectList)
+  TWaveLineList = class(TComponentList)
   private
+  protected
+    function GetItem(Index: Integer): TWaveLine; inline;
+    procedure SetItem(Index: Integer; AObject: TWaveLine); inline;
   public
     constructor Create(AOwnsObjects: Boolean);
+
+    function Add(AComponent: TWaveLine): Integer; inline;
+    function Remove(AComponent: TWaveLine): Integer; inline;
+    function RemoveItem(AComponent: TWaveLine; ADirection: TList.TDirection): Integer; inline;
+    function IndexOf(AComponent: TWaveLine): Integer; inline;
+    function IndexOfItem(AComponent: TWaveLine; ADirection: TList.TDirection): Integer; inline;
+    function First: TWaveLine; inline;
+    function Last: TWaveLine; inline;
+    procedure Insert(Index: Integer; AComponent: TWaveLine); inline;
+    property Items[Index: Integer]: TWaveLine read GetItem write SetItem;
   published
   end;
 
@@ -50,7 +69,8 @@ type
   private
     FWaveLineList: TWaveLineList;
     FGridVisable: Boolean;
-    FGridSize: Integer;
+    FXGridSize: Integer;
+    FYGridSize: Integer;
     FWaveRect: TRect;
     FBaseLineVisable: Boolean;
     FBaseLineStyle: TBaseLineStyle;
@@ -59,14 +79,15 @@ type
     procedure UpdateBase;
     procedure DrawGrid;
     procedure DrawBaseLine;
-    procedure DrawFrame;      
+    procedure DrawFrame;
     procedure DrawWave;
     procedure UpdateDataPoints;
-    procedure DrawCursor; 
+    procedure DrawCursor;
     procedure SetGridVisable(Value: Boolean);
-    procedure SetGridSize(Value: Integer);
+    procedure SetXGridSize(Value: Integer);
+    procedure SetYGridSize(Value: Integer);
     procedure SetBaseLineVisable(Value: Boolean);
-    procedure SetBaseLineStyle(Value: TBaseLineStyle);    
+    procedure SetBaseLineStyle(Value: TBaseLineStyle);
     procedure SetWaveLineList(Value: TWaveLineList);
     protected
     procedure Paint; override;
@@ -76,7 +97,8 @@ type
     destructor Destroy;
   published
     property GridVisable: Boolean read FGridVisable write SetGridVisable default True;
-    property GridSize: Integer read FGridSize write SetGridSize default 20;
+    property XGridSize: Integer read FXGridSize write SetXGridSize default 20;
+    property YGridSize: Integer read FYGridSize write SetYGridSize default 20;
     property BaseLineVisable: Boolean read FBaseLineVisable write SetBaseLineVisable default True;
     property BaseLineStyle: TBaseLineStyle read FBaseLineStyle write SetBaseLineStyle default blsMid;
     property WaveLineItems: TWaveLineList read FWaveLineList write SetWaveLineList;
@@ -96,6 +118,7 @@ implementation
 procedure register;
 begin
   RegisterComponents('CloudControl', [TWaveViewer]);
+  RegisterComponents('CloudControl', [TWaveLine]);
 end;
 
 
@@ -111,7 +134,10 @@ constructor TWaveViewer.Create(AOwner: TComponent);
 begin
   inherited;
   FGridVisable := True;
-  FGridSize := 20;
+  BaseLineVisable := True;
+  BaseLineStyle := blsMid;
+  FXGridSize := 20;
+  FYGridSize := 20;
   FWaveLineList := TWaveLineList.Create(True);
 end;
 
@@ -157,8 +183,8 @@ var
 begin
   Canvas.Pen.Color := clGray;
   //Draw Up
-  xStep := FGridSize;
-  yStep := FGridSize;
+  xStep := FXGridSize;
+  yStep := FYGridSize;
   Canvas.Pen.Style := psDot;
   y := yBase - yStep;
   while y >= FWaveRect.Top do
@@ -191,8 +217,11 @@ begin
 end;
 
 procedure TWaveViewer.Paint;
+var
+  i: Integer;
 begin
   inherited;
+
   FWaveRect.Left := 40;
   FWaveRect.Top := 20;
   FWaveRect.Width := Self.Width - 80;
@@ -207,6 +236,10 @@ begin
     DrawBaseLine;
   end;
   DrawFrame;
+  for i := 0 to FWaveLineList.Count-1 do
+  begin
+    FWaveLineList.Items[i].Paint;
+  end;
 end;
 
 procedure TWaveViewer.SetBaseLineStyle(Value: TBaseLineStyle);
@@ -227,15 +260,6 @@ begin
   end;
 end;
 
-procedure TWaveViewer.SetGridSize(Value: Integer);
-begin
-  if FGridSize <> Value then
-  begin
-    FGridSize := Value;
-    Invalidate;
-  end;
-end;
-
 procedure TWaveViewer.SetGridVisable(Value: Boolean);
 begin
   if FGridVisable <> Value then
@@ -248,6 +272,24 @@ end;
 procedure TWaveViewer.SetWaveLineList(Value: TWaveLineList);
 begin
 
+end;
+
+procedure TWaveViewer.SetXGridSize(Value: Integer);
+begin
+  if FXGridSize <> Value then
+  begin
+    FXGridSize := Value;
+    Invalidate;
+  end;
+end;
+
+procedure TWaveViewer.SetYGridSize(Value: Integer);
+begin
+  if FYGridSize <> Value then
+  begin
+    FYGridSize := Value;
+    Invalidate;
+  end;
 end;
 
 procedure TWaveViewer.UpdateBase;
@@ -268,6 +310,7 @@ end;
 
 
 { TWaveLine }
+
 procedure TWaveLine.AddData(Value: Single);
 begin
   Datas[CurrentPoint] := Value;
@@ -281,6 +324,7 @@ end;
 constructor TWaveLine.Create(AOwner: TWaveViewer);
 begin
   Parent := AOwner;
+  Visable := True;
 end;
 
 constructor TWaveLine.Create(AOwner: TWaveViewer; Len: Integer);
@@ -288,6 +332,26 @@ begin
   Create(AOwner);
   SetWaveLength(Len);
   AOwner.AttachWaveLine(Self);
+end;
+
+procedure TWaveLine.Paint;
+var
+  i : Integer;
+begin
+  if FVisable then
+  begin
+    UpdatePoints;
+    with Parent.Canvas do
+    begin
+      Pen.Color := FColor;
+      Pen.Style := psSolid;
+      MoveTo(Points[0].X, Points[0].Y);
+      for i := 0 to DataLength-1 do
+      begin
+        LineTo(Points[i].X, Points[i].Y);
+      end;
+    end;
+  end;
 end;
 
 procedure TWaveLine.SetColor(Value: TColor);
@@ -299,22 +363,103 @@ begin
   Parent.Invalidate;
 end;
 
+procedure TWaveLine.SetVisable(Value: Boolean);
+begin
+  if Value <> FVisable then
+  begin
+    FVisable := Value;
+    Parent.Invalidate;
+  end;
+end;
+
 procedure TWaveLine.SetWaveLength(Value: Integer);
 begin
   SetLength(Datas, Value);
   SetLength(Points, Value);
-  ZeroMemory(Datas, Value);
-  ZeroMemory(Points, Value);
+  ZeroMemory(Datas, Sizeof(Datas));
+  ZeroMemory(Points, Sizeof(Points));
   CurrentPoint := 0;
   DataLength := Value;
 end;
 
+procedure TWaveLine.SetWaveViewMode(Value: TWaveViewMode);
+begin
+  if Value <> FWaveViewMode then
+  begin
+    FWaveViewMode := Value;
+  end;
+end;
+
+procedure TWaveLine.UpdatePoints;
+var
+  i : Integer;
+begin
+  //TODO: do optimization avoid over calculation
+  for i := 0 to DataLength-1 do
+  begin
+    Points[i].X := Parent.xBase + Round(i * Parent.XGridSize / ValueOfXGrid);
+    Points[i].Y := Parent.yBase - Round(Datas[i] * Parent.YGridSize / ValueOfYGrid);
+  end;
+end;
+
 { TWaveLineList }
+
+function TWaveLineList.Add(AComponent: TWaveLine): Integer;
+begin
+  Result := inherited Add(AComponent);
+end;
 
 constructor TWaveLineList.Create(AOwnsObjects: Boolean);
 begin
   inherited;
 
+end;
+
+function TWaveLineList.First: TWaveLine;
+begin
+  Result := inherited First as TWaveLine;
+end;
+
+function TWaveLineList.GetItem(Index: Integer): TWaveLine;
+begin
+  Result := inherited Items[Index] as TWaveLine;
+end;
+
+function TWaveLineList.IndexOf(AComponent: TWaveLine): Integer;
+begin
+  Result := inherited IndexOf(AComponent);
+end;
+
+function TWaveLineList.IndexOfItem(AComponent: TWaveLine;
+  ADirection: TList.TDirection): Integer;
+begin
+  Result := inherited IndexOfItem(AComponent, ADirection);
+end;
+
+procedure TWaveLineList.Insert(Index: Integer; AComponent: TWaveLine);
+begin
+  inherited Insert(Index, AComponent);
+end;
+
+function TWaveLineList.Last: TWaveLine;
+begin
+  Result := inherited Last as TWaveLine;
+end;
+
+function TWaveLineList.Remove(AComponent: TWaveLine): Integer;
+begin
+  Result := inherited Remove(AComponent);
+end;
+
+function TWaveLineList.RemoveItem(AComponent: TWaveLine;
+  ADirection: TList.TDirection): Integer;
+begin
+  Result := inherited RemoveItem(AComponent, ADirection);
+end;
+
+procedure TWaveLineList.SetItem(Index: Integer; AObject: TWaveLine);
+begin
+  inherited Items[Index] := AObject;
 end;
 
 end.
