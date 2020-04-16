@@ -1,2 +1,2 @@
 # WaveViewer_Control
-Simple VCL Compoment of wave display based on delphi
+Simple VCL Component of wave display based on delphi
