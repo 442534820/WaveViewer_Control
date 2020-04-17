@@ -19,30 +19,36 @@ type
     FColor: TColor;
     FWaveViewMode: TWaveViewMode;
     FVisable: Boolean;
+    FValueOfXGrid: Integer;
+    FValueOfYGrid: Single;
+    FParent: TWaveViewer;
+    FDataLength: Integer;
     procedure SetColor(Value: TColor);
     procedure SetWaveViewMode(Value: TWaveViewMode);
     procedure SetVisable(Value: Boolean);
-    procedure SetWaveLength(Value: Integer);
+    procedure SetDataLength(Value: Integer);
+    procedure SetValueOfXGrid(Value: Integer);
+    procedure SetValueOfYGrid(Value: Single);
+    procedure SetParent(Value: TWaveViewer);
   protected
   public
     BaseMarkVisable: Boolean;
     Order: Integer;
-    ValueOfXGrid: Integer;
-    ValueOfYGrid: Single;
     Datas: array of Single;
     Points: array of TPoints;
-    DataLength: Integer;
     CurrentPoint: Integer;
-    Parent: TWaveViewer;
     procedure AddData(Value: Single);
     procedure UpdatePoints;
-    constructor Create(AOwner: TWaveViewer); overload;
-    constructor Create(AOwner: TWaveViewer; Len: Integer); overload;
+    constructor Create(AOwner: TComponent); override;
     procedure Paint;
   published
     property Color: TColor read FColor write SetColor;
     property WaveViewMode: TWaveViewMode read FWaveViewMode write SetWaveViewMode;
     property Visable: Boolean read FVisable write SetVisable default True;
+    property ValueOfXGrid: Integer read FValueOfXGrid write SetValueOfXGrid;
+    property ValueOfYGrid: Single read FValueOfYGrid write SetValueOfYGrid;
+    property Parent: TWaveViewer read Fparent write SetParent;
+    property DataLength: Integer read FDataLength write SetDataLength;
   end;
 
   TWaveLineList = class(TComponentList)
@@ -128,6 +134,7 @@ end;
 procedure TWaveViewer.AttachWaveLine(AWaveLine: TWaveLine);
 begin
   FWaveLineList.Add(AWaveLine);
+  AWaveLine.Parent := Self;
 end;
 
 constructor TWaveViewer.Create(AOwner: TComponent);
@@ -321,17 +328,12 @@ begin
   end;
 end;
 
-constructor TWaveLine.Create(AOwner: TWaveViewer);
+constructor TWaveLine.Create(AOwner: TComponent);
 begin
-  Parent := AOwner;
-  Visable := True;
-end;
-
-constructor TWaveLine.Create(AOwner: TWaveViewer; Len: Integer);
-begin
-  Create(AOwner);
-  SetWaveLength(Len);
-  AOwner.AttachWaveLine(Self);
+  inherited;
+  FVisable := True;
+  FValueOfXGrid := 1;
+  FValueOfYGrid := 1;
 end;
 
 procedure TWaveLine.Paint;
@@ -359,8 +361,39 @@ begin
   if Value <> FColor then
   begin
     FColor := Value;
+    if FParent <> nil then
+      Parent.Invalidate;
   end;
-  Parent.Invalidate;
+end;
+
+procedure TWaveLine.SetParent(Value: TWaveViewer);
+begin
+  if Value <> FParent then
+  begin
+    FParent := Value;
+    if FParent <> nil then
+      Parent.Invalidate;
+  end;
+end;
+
+procedure TWaveLine.SetValueOfXGrid(Value: Integer);
+begin
+  if Value <> FValueOfXGrid then
+  begin
+    FValueOfXGrid := Value;
+    if FParent <> nil then
+      Parent.Invalidate;
+  end;
+end;
+
+procedure TWaveLine.SetValueOfYGrid(Value: Single);
+begin
+  if Value <> FValueOfYGrid then
+  begin
+    FValueOfXGrid := Value;
+    if FParent <> nil then
+      Parent.Invalidate;
+  end;
 end;
 
 procedure TWaveLine.SetVisable(Value: Boolean);
@@ -368,18 +401,22 @@ begin
   if Value <> FVisable then
   begin
     FVisable := Value;
-    Parent.Invalidate;
+    if FParent <> nil then
+      Parent.Invalidate;
   end;
 end;
 
-procedure TWaveLine.SetWaveLength(Value: Integer);
+procedure TWaveLine.SetDataLength(Value: Integer);
 begin
-  SetLength(Datas, Value);
-  SetLength(Points, Value);
-  ZeroMemory(Datas, Sizeof(Datas));
-  ZeroMemory(Points, Sizeof(Points));
-  CurrentPoint := 0;
-  DataLength := Value;
+  if Value <> FDataLength then
+  begin
+    SetLength(Datas, Value);
+    SetLength(Points, Value);
+    ZeroMemory(Datas, Sizeof(Datas));
+    ZeroMemory(Points, Sizeof(Points));
+    CurrentPoint := 0;
+    FDataLength := Value;
+  end;
 end;
 
 procedure TWaveLine.SetWaveViewMode(Value: TWaveViewMode);
