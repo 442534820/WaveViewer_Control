@@ -99,9 +99,11 @@ type
     procedure Paint; override;
   public
     procedure AttachWaveLine(AWaveLine: TWaveLine);
+    procedure DeAttachWaveLine(AWaveLine: TWaveLine);
     constructor Create(AOwner: TComponent); override;
     destructor Destroy;
   published
+    property Align;
     property GridVisable: Boolean read FGridVisable write SetGridVisable default True;
     property XGridSize: Integer read FXGridSize write SetXGridSize default 20;
     property YGridSize: Integer read FYGridSize write SetYGridSize default 20;
@@ -146,6 +148,11 @@ begin
   FXGridSize := 20;
   FYGridSize := 20;
   FWaveLineList := TWaveLineList.Create(True);
+end;
+
+procedure TWaveViewer.DeAttachWaveLine(AWaveLine: TWaveLine);
+begin
+  FWaveLineList.Remove(AWaveLine);
 end;
 
 destructor TWaveViewer.Destroy;
@@ -347,10 +354,32 @@ begin
     begin
       Pen.Color := FColor;
       Pen.Style := psSolid;
-      MoveTo(Points[0].X, Points[0].Y);
-      for i := 0 to DataLength-1 do
-      begin
-        LineTo(Points[i].X, Points[i].Y);
+      case FWaveViewMode of
+        wvmCover:
+        begin
+          MoveTo(Points[0].X, Points[0].Y);
+          for i := 0 to CurrentPoint-1 do
+          begin
+            LineTo(Points[i].X, Points[i].Y);
+          end;
+          MoveTo(Points[CurrentPoint].X, Points[CurrentPoint].Y);
+          for i := CurrentPoint to DataLength-1 do
+          begin
+            LineTo(Points[i].X, Points[i].Y);
+          end;
+        end;
+        wvmRoll:
+        begin
+          MoveTo(Points[0].X, Points[CurrentPoint].Y);
+          for i := CurrentPoint to DataLength-1 do
+          begin
+            LineTo(Points[i-CurrentPoint].X, Points[i].Y);
+          end;
+          for i := 0 to CurrentPoint-1 do
+          begin
+            LineTo(Points[i+DataLength-CurrentPoint].X, Points[i].Y);
+          end;
+        end;
       end;
     end;
   end;
@@ -372,7 +401,14 @@ begin
   begin
     FParent := Value;
     if FParent <> nil then
+    begin
+      Parent.AttchWaveLine(Self);
       Parent.Invalidate;
+    end
+    else
+    begin
+      Parent.DeAttchWaveLine(Self);
+    end;
   end;
 end;
 
@@ -442,7 +478,15 @@ end;
 { TWaveLineList }
 
 function TWaveLineList.Add(AComponent: TWaveLine): Integer;
+var
+  i : Integer;
 begin
+  Result := Count;
+  for i := 0 to Count-1 do
+  begin
+    if AComponent = Items[i] then
+      Exit;
+  end;
   Result := inherited Add(AComponent);
 end;
 
