@@ -9,10 +9,63 @@ uses
   Vcl.Controls;
 
 type
-  TBaseLineStyle = (blsCustom, blsTop, blsBottom, blsMid);
-  TWaveViewMode = (wvmCover, wvmRoll);
-
   TWaveViewer = class;
+  TWaveLine = class;
+
+  TCursorOrientation = (cuHorizontal, cuVertical);
+  TCursorViewMode = (cvmSimple, cvmFull);
+
+  TWaveCursor = class(TComponent)
+  private
+    FColor: TColor;
+    FLineStyle: TPenStyle;
+    FOrientation: TCursorOrientation;
+    FParent: TWaveLine;
+    FVisable: Boolean;
+    FViewMode: TCursorViewMode;
+    FPosition: Integer;
+    procedure SetColor(Value: TColor);
+    procedure SetLineStyle(Value: TPenStyle);
+    procedure SetOrientation(Value: TCursorOrientation);
+    procedure SetParent(Value: TWaveLine);
+    procedure SetVisable(Value: Boolean);
+    procedure SetViewMode(Value: TCursorViewMode);
+    procedure SetPosition(Value: Integer);
+  protected
+  public
+    constructor Create(AOwner: TComponent); override;
+    procedure Paint;
+  published
+    property Color: TColor read FColor write SetColor;
+    property LineStyle: TPenStyle read FLineStyle write SetLineStyle default psDash;
+    property Orientation: TCursorOrientation read FOrientation write SetOrientation;
+    property Parent: TWaveLine read FParent write SetParent;
+    property Visable : Boolean read FVisable write SetVisable default True;
+    property ViewMode: TCursorViewMode read FViewMode write SetViewMode default cvmFull;
+    property Position: Integer read FPosition write SetPosition;
+  end;
+
+  TWaveCursorList = class(TComponentList)
+  private
+  protected
+    function GetItem(Index: Integer): TWaveCursor; inline;
+    procedure SetItem(Index: Integer; AObject: TWaveCursor); inline;
+  public
+    constructor Create(AOwnsObjects: Boolean);
+
+    function Add(AComponent: TWaveCursor): Integer; inline;
+    function Remove(AComponent: TWaveCursor): Integer; inline;
+    function RemoveItem(AComponent: TWaveCursor; ADirection: TList.TDirection): Integer; inline;
+    function IndexOf(AComponent: TWaveCursor): Integer; inline;
+    function IndexOfItem(AComponent: TWaveCursor; ADirection: TList.TDirection): Integer; inline;
+    function First: TWaveCursor; inline;
+    function Last: TWaveCursor; inline;
+    procedure Insert(Index: Integer; AComponent: TWaveCursor); inline;
+    property Items[Index: Integer]: TWaveCursor read GetItem write SetItem;
+  published
+  end;
+
+  TWaveViewMode = (wvmCover, wvmRoll);
 
   TWaveLine = class(TComponent)
   private
@@ -23,6 +76,7 @@ type
     FValueOfYGrid: Single;
     FParent: TWaveViewer;
     FDataLength: Integer;
+    FCursorList: TWaveCursorList;
     procedure SetColor(Value: TColor);
     procedure SetWaveViewMode(Value: TWaveViewMode);
     procedure SetVisable(Value: Boolean);
@@ -30,12 +84,13 @@ type
     procedure SetValueOfXGrid(Value: Integer);
     procedure SetValueOfYGrid(Value: Single);
     procedure SetParent(Value: TWaveViewer);
+    procedure SetCursorList(Value: TWaveCursorList);
   protected
   public
     BaseMarkVisable: Boolean;
     Order: Integer;
     Datas: array of Single;
-    Points: array of TPoints;
+    Points: array of TPoint;
     CurrentPoint: Integer;
     procedure AddData(Value: Single);
     procedure UpdatePoints;
@@ -47,8 +102,9 @@ type
     property Visable: Boolean read FVisable write SetVisable default True;
     property ValueOfXGrid: Integer read FValueOfXGrid write SetValueOfXGrid;
     property ValueOfYGrid: Single read FValueOfYGrid write SetValueOfYGrid;
-    property Parent: TWaveViewer read Fparent write SetParent;
+    property Parent: TWaveViewer read FParent write SetParent;
     property DataLength: Integer read FDataLength write SetDataLength;
+    property CursorList: TWaveCursorList read FCursorList write SetCursorList;
   end;
 
   TWaveLineList = class(TComponentList)
@@ -71,6 +127,8 @@ type
   published
   end;
 
+  TBaseLineStyle = (blsCustom, blsTop, blsBottom, blsMid);
+
   TWaveViewer = class(TGraphicControl)
   private
     FWaveLineList: TWaveLineList;
@@ -80,22 +138,23 @@ type
     FWaveRect: TRect;
     FBaseLineVisable: Boolean;
     FBaseLineStyle: TBaseLineStyle;
-    xBase: Integer;
-    yBase: Integer;
+    XBase: Integer;
+    YBase: Integer;
     procedure UpdateBase;
     procedure DrawGrid;
     procedure DrawBaseLine;
-    procedure DrawFrame;
+    procedure DrawFrame;       
     procedure DrawWave;
     procedure UpdateDataPoints;
-    procedure DrawCursor;
+    procedure DrawCursor; 
     procedure SetGridVisable(Value: Boolean);
     procedure SetXGridSize(Value: Integer);
     procedure SetYGridSize(Value: Integer);
+    procedure SetWaveRect(Value: TRect);
     procedure SetBaseLineVisable(Value: Boolean);
-    procedure SetBaseLineStyle(Value: TBaseLineStyle);
+    procedure SetBaseLineStyle(Value: TBaseLineStyle);    
     procedure SetWaveLineList(Value: TWaveLineList);
-    protected
+  protected
     procedure Paint; override;
   public
     procedure AttachWaveLine(AWaveLine: TWaveLine);
@@ -107,6 +166,7 @@ type
     property GridVisable: Boolean read FGridVisable write SetGridVisable default True;
     property XGridSize: Integer read FXGridSize write SetXGridSize default 20;
     property YGridSize: Integer read FYGridSize write SetYGridSize default 20;
+    property WaveRect: TRect read FWaveRect write SetWaveRect;
     property BaseLineVisable: Boolean read FBaseLineVisable write SetBaseLineVisable default True;
     property BaseLineStyle: TBaseLineStyle read FBaseLineStyle write SetBaseLineStyle default blsMid;
     property WaveLineItems: TWaveLineList read FWaveLineList write SetWaveLineList;
@@ -127,6 +187,7 @@ procedure register;
 begin
   RegisterComponents('CloudControl', [TWaveViewer]);
   RegisterComponents('CloudControl', [TWaveLine]);
+  RegisterComponents('CloudControl', [TWaveCursor]);
 end;
 
 
@@ -232,7 +293,7 @@ end;
 
 procedure TWaveViewer.Paint;
 var
-  i: Integer;
+  i : Integer;
 begin
   inherited;
 
@@ -288,6 +349,15 @@ begin
 
 end;
 
+procedure TWaveViewer.SetWaveRect(Value: TRect);
+begin
+  if Value <> FWaveRect then
+  begin
+    FWaveRect := Value;
+    Invalidate;
+  end;
+end;
+
 procedure TWaveViewer.SetXGridSize(Value: Integer);
 begin
   if FXGridSize <> Value then
@@ -341,12 +411,16 @@ begin
   FVisable := True;
   FValueOfXGrid := 1;
   FValueOfYGrid := 1;
+  FParent := nil;
+  FCursorList := TWaveCursorList.Create(True);
 end;
 
 procedure TWaveLine.Paint;
 var
   i : Integer;
 begin
+  if Parent = nil then
+    Exit;
   if FVisable then
   begin
     UpdatePoints;
@@ -383,6 +457,10 @@ begin
       end;
     end;
   end;
+  for i := 0 to FCursorList.Count-1 do
+  begin
+    FCursorList.Items[i].Paint;
+  end;
 end;
 
 procedure TWaveLine.SetColor(Value: TColor);
@@ -395,19 +473,27 @@ begin
   end;
 end;
 
+procedure TWaveLine.SetCursorList(Value: TWaveCursorList);
+begin
+
+end;
+
 procedure TWaveLine.SetParent(Value: TWaveViewer);
 begin
   if Value <> FParent then
   begin
-    FParent := Value;
+    // DeAttach if attached before
     if FParent <> nil then
     begin
-      Parent.AttchWaveLine(Self);
-      Parent.Invalidate;
-    end
-    else
+      FParent.DeAttachWaveLine(Self);
+      FParent.Invalidate;
+    end;
+    FParent := Value;
+    // Attach if want to attach a new wave viwer
+    if FParent <> nil then
     begin
-      Parent.DeAttchWaveLine(Self);
+      FParent.AttachWaveLine(Self);
+      FParent.Invalidate;
     end;
   end;
 end;
@@ -426,7 +512,7 @@ procedure TWaveLine.SetValueOfYGrid(Value: Single);
 begin
   if Value <> FValueOfYGrid then
   begin
-    FValueOfXGrid := Value;
+    FValueOfYGrid := Value;
     if FParent <> nil then
       Parent.Invalidate;
   end;
@@ -448,8 +534,8 @@ begin
   begin
     SetLength(Datas, Value);
     SetLength(Points, Value);
-    ZeroMemory(Datas, Sizeof(Datas));
-    ZeroMemory(Points, Sizeof(Points));
+    ZeroMemory(Datas, SizeOf(Datas));
+    ZeroMemory(Points, SizeOf(Points));
     CurrentPoint := 0;
     FDataLength := Value;
   end;
@@ -539,6 +625,193 @@ begin
 end;
 
 procedure TWaveLineList.SetItem(Index: Integer; AObject: TWaveLine);
+begin
+  inherited Items[Index] := AObject;
+end;
+
+{ TWaveCursor }
+
+constructor TWaveCursor.Create(AOwner: TComponent);
+begin
+  inherited;
+  FVisable := True;
+  FLineStyle := psDash;
+  FViewMode := cvmFull;
+  FParent := nil;
+end;
+
+procedure TWaveCursor.Paint;
+var
+  i : Integer;
+begin
+  if (Parent = nil) or (Parent.Parent = nil) then
+    Exit;
+  if FVisable then
+  begin
+    with Parent.Parent.Canvas do
+    begin
+      Pen.Color := FColor;
+      Pen.Style := psSolid;
+      case ViewMode of
+        cvmSimple:
+        begin
+
+        end;
+       cvmFull:
+        begin
+          case FOrientation of
+            cuHorizontal:
+            begin
+              MoveTo(Parent.Parent.WaveRect.Left, FPosition);
+              LineTo(Parent.Parent.WaveRect.Right, FPosition);
+            end;
+            cuVertical:
+            begin
+              MoveTo(FPosition, Parent.Parent.WaveRect.Top);
+              LineTo(FPosition, Parent.Parent.WaveRect.Bottom);
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure TWaveCursor.SetColor(Value: TColor);
+begin
+  if Value <> FColor then
+  begin
+    FColor := Value;
+  end;
+end;
+
+procedure TWaveCursor.SetLineStyle(Value: TPenStyle);
+begin
+  if Value <> FLineStyle then
+  begin
+    FLineStyle := Value;
+  end;
+end;
+
+procedure TWaveCursor.SetOrientation(Value: TCursorOrientation);
+begin
+  if Value <> FOrientation then
+  begin
+    FOrientation := Value;
+  end;
+end;
+
+procedure TWaveCursor.SetParent(Value: TWaveLine);
+begin
+  if Value <> FParent then
+  begin
+    if FParent <> nil then
+    begin
+      FParent.CursorList.Remove(Self);
+      if FParent.Parent <> nil then
+        FParent.Parent.Invalidate;
+    end;
+    FParent := Value;
+    if FParent <> nil then
+    begin
+      FParent.CursorList.Add(Self);
+      if FParent.Parent <> nil then
+        FParent.Parent.Invalidate;
+    end;
+  end;
+end;
+
+procedure TWaveCursor.SetPosition(Value: Integer);
+begin
+  if Value <> FPosition then
+  begin
+    FPosition := Value;
+    if (Parent <> nil) and (Parent.Parent <> nil) then
+    begin
+      Parent.Parent.Invalidate;
+    end;
+  end;
+end;
+
+procedure TWaveCursor.SetViewMode(Value: TCursorViewMode);
+begin
+  if Value <> FViewMode then
+  begin
+    FViewMode := Value;
+  end;
+end;
+
+procedure TWaveCursor.SetVisable(Value: Boolean);
+begin
+  if Value <> FVisable then
+  begin
+    FVisable := Value;
+  end;
+end;
+
+{ TWaveCursorList }
+
+function TWaveCursorList.Add(AComponent: TWaveCursor): Integer;
+var
+  i : Integer;
+begin
+  Result := Count;
+  for i := 0 to Count-1 do
+  begin
+    if AComponent = Items[i] then
+      Exit;
+  end;
+  Result := inherited Add(AComponent);
+end;
+
+constructor TWaveCursorList.Create(AOwnsObjects: Boolean);
+begin
+  inherited;
+end;
+
+function TWaveCursorList.First: TWaveCursor;
+begin
+  Result := inherited First as TWaveCursor;
+end;
+
+function TWaveCursorList.GetItem(Index: Integer): TWaveCursor;
+begin
+  Result := inherited Items[Index] as TWaveCursor;
+end;
+
+function TWaveCursorList.IndexOf(AComponent: TWaveCursor): Integer;
+begin
+  Result := inherited IndexOf(AComponent);
+end;
+
+function TWaveCursorList.IndexOfItem(AComponent: TWaveCursor;
+  ADirection: TList.TDirection): Integer;
+begin
+  Result := inherited IndexOfItem(AComponent, ADirection);
+end;
+
+procedure TWaveCursorList.Insert(Index: Integer; AComponent: TWaveCursor);
+begin
+  inherited Insert(Index, AComponent);
+end;
+
+function TWaveCursorList.Last: TWaveCursor;
+begin
+  Result := inherited Last as TWaveCursor;
+end;
+
+function TWaveCursorList.Remove(AComponent: TWaveCursor): Integer;
+begin
+  Result := inherited Remove(AComponent);
+end;
+
+function TWaveCursorList.RemoveItem(AComponent: TWaveCursor;
+  ADirection: TList.TDirection): Integer;
+begin
+  Result := inherited RemoveItem(AComponent, ADirection);
+end;
+
+procedure TWaveCursorList.SetItem(Index: Integer; AObject: TWaveCursor);
 begin
   inherited Items[Index] := AObject;
 end;
